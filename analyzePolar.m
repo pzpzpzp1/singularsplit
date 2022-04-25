@@ -1,4 +1,4 @@
-function [x,u,v,V,T,data,lambda] = analyzePolar(optol,constol)
+function [x,u,v,V,T,data,lambda,fval] = analyzePolar(optol,constol)
     if nargin==0
         optol=1e-6;
         constol=1e-6;
