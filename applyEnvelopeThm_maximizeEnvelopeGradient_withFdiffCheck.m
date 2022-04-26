@@ -2,7 +2,7 @@
 clear all; close all; 
 
 %% load data
-optol = 1e-7;
+optol = 1e-6;
 [x,u,v,V,T,data,lambda,fval0] = analyzePolar(1e-9,1e-9); close all;
 data0 = getMeshData(V,T); data=data0; V0=V; T0=T;
 areaFromV123 = @(v123) dot(cross(v123(2,:)-v123(1,:),v123(3,:)-v123(1,:)),[0 0 1])/2;
@@ -13,7 +13,9 @@ innerEdges = find(all(~ismember(data.edges, boundaryVerts),2))'; niie = numel(in
 nie=sum(~data.isBoundaryEdge);
 adiff_part1 = nan(niie,1);
 adiff_part2 = nan(niie,1);
+fdiffs = nan(niie,1);
 for j = 1:niie
+    
     intedgeind  = innerEdges(j);
     
     % flip edges
@@ -58,7 +60,7 @@ for j = 1:niie
     v3 = v(t3,:)';
 
     %% build perturbation frames
-    eps = 1e-5; % 1e-5, 1e-4 seem ok. too small and hit optimality tolerance too quick obtaining inaccurate answer. too large and it never finishes solving.
+    eps = 1e-4; % 1e-5, 1e-4 seem ok. too small and hit optimality tolerance too quick obtaining inaccurate answer. too large and it never finishes solving.
     z = zeros(1,2);
     Am = [e1v' z z z; z z e1v' z; z e2v' z z; z z z e2v'; z ehat' ehat' z; -ehat' z z ehat'];
     Bm = [dot(u0,e1v); dot(v0,e1v); dot(u2,e2v); dot(v2,e2v); 0; 0];
@@ -76,41 +78,29 @@ for j = 1:niie
     newv = data.vertices(p1,:) + eps*[ehat' 0];
     newvind = data.numVertices+1;
     Vnew = [V; newv]; 
-    Tnew = T; 
-    Tnew(t1,:)=[p2 p4  newvind];
-    Tnew(t3,:)=[p6 p2 newvind];
-    Tnew = [Tnew; p4 p1 newvind ; p1 p6 newvind ];
+    Tnew = T;     Tnew(t1,:)=[p2 p4  newvind];    Tnew(t3,:)=[p6 p2 newvind];    Tnew = [Tnew; p4 p1 newvind ; p1 p6 newvind ];
     permuteEdgeVinds = [p1 newvind];
     x0 = reshape([reshape(x,[],2); reshape(xperturb,[],2)],[],1);
     [newX,newU,newV,~,~,newData,newLambda,fval1,C] = computePolyvectorField(Vnew,Tnew,optol,x0,permuteEdgeVinds);
-    FDIFF = (fval1-fval0)/eps; % -.17 seems right for the first one. 
+    fdiffs(j) = (fval1-fval0)/eps; 
+    % [intedgeind=201: -.17 | gt =  -0.47667     -0.86683     -0.50003   -0.0069196      0.61278      -4.1552     -0.40546      -3.4958] 
+    % [intedgeind=3044: -34.112 | gt = -31.896       4.2846      -31.552      -8.3002       35.544      -6.0746      -28.372      -8.4041] 
 
     xr = reshape(newX,[],2);
     gt = reshape(xr(end-3:end,:),[],1);
     
     %TODO: CHECK LAMBDAS. TRY OPTIMIZING dL/dalpha w.r.t. virtual frames
 
-    %% obtain primal virtual frames (this is the key part to test)
-    z = zeros(1,2);
-    Am = [e1v' z z z; z z e1v' z; z e2v' z z; z z z e2v'; z ehat' ehat' z; -ehat' z z ehat'];
-    Bm = [dot(u0,e1v); dot(v0,e1v); dot(u2,e2v); dot(v2,e2v); 0; 0];
-    eps = 1e-8;
-    e3p = e1v + eps * ehat;
-    e4p = e2v + eps * ehat;
-    e1p = e1v;    e2p = e2v;
-    ehp = ehat;
-    A = [e1p' z z z; z z e1p' z; z e2p' z z; z z z e2p'; z ehp' ehp' z; -ehp' z z ehp';...
-        e3p' z z z; z z e3p' z; z e4p' z z; z z z e4p'];
-    B = [dot(u0,e1p); dot(v0,e1p); dot(u2,e2p); dot(v2,e2p); 0; 0;...
-        dot(u1,e3p); dot(v1,e3p); dot(u3,e4p); dot(v3,e4p); ];
-    x0 = A\B;
+    %% set primal virtual frames (this is the key part to test)
     % lopital's rule area ratio
+    %{
     A4_div_A5 = abs(norm(cross([e1v' 0],[ehat' 0]))/norm(cross([e2v' 0],[ehat' 0])));
     fun = @(x)obfun_wrapper(x,[A4_div_A5 1]);
     options = optimoptions('fmincon','Display','Iter','CheckGradients',false,'SpecifyObjectiveGradient',true,'Algorithm','interior-point','HessianApproximation','lbfgs','SpecifyConstraintGradient',true,...
         'OptimalityTolerance',optol);
     xl = fmincon(fun,x0,[],[],Am,Bm,[],[],[],options); % use min energy frames
-    xl = gt;
+    %}
+    xl = gt; % use gt frames
 %     xl = x0; % use perturbation frames
     u4 = xl(1:2);
     u5 = xl(3:4);
@@ -169,17 +159,22 @@ for j = 1:niie
     end
     adiff_part2(j) = l1u*dot(u1-u4,ehat) + l1v*dot(v1-v4,ehat) + l2u*dot(u3-u5,ehat) + l2v*dot(v3-v5,ehat);
 
-%     if j/niie > .06
-%         break;
-%     end
+    if j/niie > .06
+        break;
+    end
 end
 adiffs = adiff_part1 + adiff_part2;
 
-% lambdadgdx = full(abs(lambda.eqlin.*vecnorm(constraintGradientMatrix,2,2)));
+edgescore = -fdiffs;
+%{
+edgescore = adiffs;
+edgescore = adiff_part1;
+edgescore = adiff_part1;
+edgescore = -fdiffs;
+%}
+% edgescore(edgescore<0)=0;
 figure; hold all; rotate3d on; title('score'); %axis equal;
 patch('faces',T,'Vertices',V,'facecolor','blue','edgecolor','none')
-edgescore = adiffs;
-% edgescore(edgescore<0)=0;
 xx = reshape(data.vertices(data.edges(innerEdges,:)',1),2,[]);
 yy = reshape(data.vertices(data.edges(innerEdges,:)',2),2,[]);
 xx(3,:)=nan;yy(3,:)=nan;xx = xx(:);yy = yy(:);
