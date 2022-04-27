@@ -1,5 +1,5 @@
 
-function [x,u,v,V,T,data,lambda,fval,C] = computePolyvectorField(V,T,optol,x0,permuteEdgeVinds)
+function [x,u,v,V,T,data,lambda,fval,C,exitflag] = computePolyvectorField(V,T,optol,x0,permuteEdgeVinds)
     if nargin==0
         %% load data
         meshname = 'data/polar_wedge_no_singularities.obj';

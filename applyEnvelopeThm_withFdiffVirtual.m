@@ -14,9 +14,11 @@ nie=sum(~data.isBoundaryEdge);
 adiff_part1 = nan(niie,1);
 adiff_part2 = nan(niie,1);
 fdiffs = nan(niie,1);
+order = randperm(niie); order = 1:niie;
+order(order==2807)=[]; order = [2807 order];
 for j = 1:niie
     
-    intedgeind  = innerEdges(j);
+    intedgeind  = innerEdges(order(j));
     
     % flip edges
 %     p1 = data.edges(intedgeind,2);
@@ -77,11 +79,11 @@ for j = 1:niie
     %% build new mesh topology
     newv = data.vertices(p1,:) + eps*[ehat' 0];
     newvind = data.numVertices+1;
-    Vnew = [V; newv]; 
+    Vnew = [V0; newv]; 
     Tnew = T;     Tnew(t1,:)=[p2 p4  newvind];    Tnew(t3,:)=[p6 p2 newvind];    Tnew = [Tnew; p4 p1 newvind ; p1 p6 newvind ];
     permuteEdgeVinds = [p1 newvind];
     x0 = reshape([reshape(x,[],2); reshape(xperturb,[],2)],[],1);
-    [newX,newU,newV,~,~,newData,newLambda,fval1,C] = computePolyvectorField(Vnew,Tnew,optol,x0,permuteEdgeVinds);
+    [newX,newU,newV,~,~,newData,newLambda,fval1,C,exitflag(j)] = computePolyvectorField(Vnew,Tnew,optol,x0,permuteEdgeVinds);
     fdiffs(j) = (fval1-fval0)/eps; 
     % [intedgeind=201: -.17 | gt =  -0.47667     -0.86683     -0.50003   -0.0069196      0.61278      -4.1552     -0.40546      -3.4958] 
     % [intedgeind=3044: -34.112 | gt = -31.896       4.2846      -31.552      -8.3002       35.544      -6.0746      -28.372      -8.4041] 
@@ -159,28 +161,72 @@ for j = 1:niie
     end
     adiff_part2(j) = l1u*dot(u1-u4,ehat) + l1v*dot(v1-v4,ehat) + l2u*dot(u3-u5,ehat) + l2v*dot(v3-v5,ehat);
 
-    if j/niie > .06
-        break;
+    %% get xperturb that minimizes env grad: dLda
+    %{
+    fun = @(x)obfun_wrapper(x, 1);
+    xo=Am\Bm;N=null(Am); dt=1e-1;
+    uv45 = gt;
+    for t=1:500
+        % project onto nullspace
+        n=N\(uv45-xo);
+        uv45 = xo+N*n;
+        u4 = uv45(1:2);
+        u5 = uv45(3:4);
+        v4 = uv45(5:6);
+        v5 = uv45(7:8);
+
+        % get d_dLdalpha_d_uv45
+        [~,dEduv4] = fun([u4;v4]);
+        [~,dEduv5] = fun([u5;v5]);
+        duv4 = dEduv4*dAda(3) - (l1u*[ehat; z'] + l1v*[z'; ehat]);
+        duv5 = dEduv5*dAda(4) - (l2u*[ehat; z'] + l2v*[z'; ehat]);
+        duv45 = reshape([reshape(duv4,2,2); reshape(duv5,2,2); ],[],1);
+        
+        % project onto tangent space
+        duv45 = N*(N\duv45);
+
+        % step
+        uv45 = uv45 - dt * duv45;
+        norm(uv45-gt)
     end
+    uv45_min_dLda = uv45;
+    %}
+
+    %% break at set percentage
+%     if j/niie > .03758
+%         break;
+%     end
 end
 adiffs = adiff_part1 + adiff_part2;
+adiffs2 = adiff_part1 - adiff_part2;
 
 edgescore = -fdiffs;
 %{
-edgescore = adiffs;
-edgescore = adiff_part1;
-edgescore = adiff_part1;
 edgescore = -fdiffs;
+edgescore = -adiffs;
+edgescore = adiff_part1;
+edgescore = -adiff_part2;
+edgescore = adiffs2;
 %}
-% edgescore(edgescore<0)=0;
-figure; hold all; rotate3d on; title('score'); %axis equal;
+edgescore(abs(edgescore)>prctile(abs(edgescore),99.99))=nan;
+edgescore(edgescore<prctile(edgescore,.01))=nan;
+figure; hold all; rotate3d on; title('score'); axis equal;
 patch('faces',T,'Vertices',V,'facecolor','blue','edgecolor','none')
-xx = reshape(data.vertices(data.edges(innerEdges,:)',1),2,[]);
-yy = reshape(data.vertices(data.edges(innerEdges,:)',2),2,[]);
+xx = reshape(data.vertices(data.edges(innerEdges(order),:)',1),2,[]);
+yy = reshape(data.vertices(data.edges(innerEdges(order),:)',2),2,[]);
 xx(3,:)=nan;yy(3,:)=nan;xx = xx(:);yy = yy(:);
 patch(xx,yy,yy*0,repelem(edgescore,3,1),'edgecolor','interp','linewidth',2)
 colorbar;colormap(inferno);
 [~,maxind]=max(edgescore);
-patch('vertices',data.vertices,'faces',data.edges(innerEdges(maxind),[1 2 1]),'edgecolor','green','linewidth',3)
+patch('vertices',data.vertices,'faces',data.edges(innerEdges(order(maxind)),[1 2 1]),'edgecolor','green','linewidth',3)
 
-
+[~,perm] = sort(fdiffs);
+figure; 
+clf; 
+subplot(2,1,1); hold all;
+plot(adiffs(perm)*130,'r')
+plot(-adiffs2(perm)*100,'b')
+plot(fdiffs(perm),'g','linewidth',2)
+subplot(2,1,2); hold all;
+plot(adiff_part1(perm)*500,'b')
+plot(adiff_part2(perm)*-80,'g')
