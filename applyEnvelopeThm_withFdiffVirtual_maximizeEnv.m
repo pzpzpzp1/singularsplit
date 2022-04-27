@@ -121,7 +121,7 @@ for j = 1:niie
     xperturb = A\B;
 
     %% build ground truth frames
-    %{
+    
     newv = data.vertices(p1,:) + eps*[ehat' 0];
     newvind = data.numVertices+1;
     Vnew = [V0; newv]; 
@@ -134,8 +134,8 @@ for j = 1:niie
     % [intedgeind=3044: -34.112 | gt = -31.896       4.2846      -31.552      -8.3002       35.544      -6.0746      -28.372      -8.4041] 
     xr = reshape(newX,[],2);
     gt = reshape(xr(end-3:end,:),[],1);
-    %}
     
+
     %% set primal virtual frames 
     %{
     A4_div_A5 = abs(norm(cross([e1v' 0],[ehat' 0]))/norm(cross([e2v' 0],[ehat' 0]))); % lopital
@@ -151,7 +151,7 @@ for j = 1:niie
     options = optimoptions('fmincon','Display','Iter','CheckGradients',false,'SpecifyObjectiveGradient',true,'Algorithm','interior-point','HessianApproximation','lbfgs',...
         'OptimalityTolerance',optol,'ConstraintTolerance',1e-14);
     obfun = @(xx) dLda_part(dAda, @(x)obfun_wrapper(x, 1), [l1u l1v l2u l2v], ehat, xx);
-    [xl,~,exitflag,~,~,grad,hessian] = fmincon(obfun,xperturb,[],[],Am,Bm,[],[],[],options);
+    [xl,~,exitflag,~,~,grad,hessian] = fmincon(obfun,gt,[],[],Am,Bm,[],[],@jacdets,options);
 
     %% envelope gradient
     extraIn.u1=u1;
@@ -172,11 +172,11 @@ end
 adiffs = adiff_part1 + adiff_part2;
 adiffs2 = adiff_part1 - adiff_part2;
 
-edgescore = -fdiffs;
+edgescore = -adiffs;
 %{
 edgescore = -fdiffs;
-edgescore = adiffs;
-edgescore = adiff_part1;
+edgescore = -adiffs;
+edgescore = -adiff_part1;
 edgescore = -adiff_part2;
 edgescore = adiffs2;
 %}
