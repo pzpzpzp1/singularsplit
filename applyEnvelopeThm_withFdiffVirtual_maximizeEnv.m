@@ -178,15 +178,19 @@ for j = 1:niie
         % get d_dLdalpha_d_uv45
         [~,dEduv4] = fun([u4;v4]);
         [~,dEduv5] = fun([u5;v5]);
-        duv4 = dEduv4*dAda(3) - (l1u*[ehat; z'] + l1v*[z'; ehat]);
-        duv5 = dEduv5*dAda(4) - (l2u*[ehat; z'] + l2v*[z'; ehat]);
+%         duv4 = dEduv4*dAda(3) - (l1u*[ehat; z'] + l1v*[z'; ehat]);
+%         duv5 = dEduv5*dAda(4) - (l2u*[ehat; z'] + l2v*[z'; ehat]);
+%         duv4 = dEduv4*dAda(3);
+%         duv5 = dEduv5*dAda(4);
+        duv4 =  - (l1u*[ehat; z'] + l1v*[z'; ehat]);
+        duv5 =  - (l2u*[ehat; z'] + l2v*[z'; ehat]);
         duv45 = reshape([reshape(duv4,2,2); reshape(duv5,2,2); ],[],1);
         
         % project onto tangent space
         duv45 = N*(N\duv45);
 
         % step
-        uv45 = uv45 - dt * duv45;
+        uv45 = uv45 + dt * duv45;
         norm(uv45-gt)
     end
     uv45_min_dLda = uv45;
