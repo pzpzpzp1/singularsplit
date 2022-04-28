@@ -42,3 +42,17 @@ scatter(data.vertices(vv2,1),data.vertices(vv2,2),'r','filled')
 figure; plot(xxs, fds, 'r.-')
 figure; plot( fds, 'r.-')
 title('fdiff scores from 303 to 399. second from bottom row of edges. 2 in from boundary.')
+
+
+
+figure; hold all; rotate3d on; title('score'); axis equal;
+patch('faces',T,'Vertices',V,'facecolor','blue','edgecolor','none')
+xx = reshape(data.vertices(data.edges(innerEdges(order),:)',1),2,[]);
+yy = reshape(data.vertices(data.edges(innerEdges(order),:)',2),2,[]);
+xx(3,:)=nan;yy(3,:)=nan;xx = xx(:);yy = yy(:);
+patch(xx,yy,yy*0,repelem(edgescore,3,1),'edgecolor','interp','linewidth',2)
+colorbar;colormap(inferno);
+[~,maxind]=max(edgescore);
+patch('vertices',data.vertices,'faces',data.edges(innerEdges(order(maxind)),[1 2 1]),'edgecolor','green','linewidth',3)
+
+
