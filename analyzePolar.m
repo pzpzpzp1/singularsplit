@@ -1,7 +1,8 @@
-function [x,u,v,V,T,data,lambda,fval] = analyzePolar(optol,constol)
+function [x,u,v,V,T,data,lambda,fval] = analyzePolar(optol,constol,reps)
     if nargin==0
         optol=1e-6;
         constol=1e-6;
+        reps=0;
     end
 
     %% load data
@@ -26,6 +27,15 @@ function [x,u,v,V,T,data,lambda,fval] = analyzePolar(optol,constol)
     x0 = [reshape(u',[],1); reshape(v',[],1)];
     J0 = permute(reshape(x0,2,[],2),[1 3 2]);
     data = getMeshData(V,T);
+
+    if reps>0
+        iv = setdiff(1:data.numVertices,unique(data.edges(data.isBoundaryEdge,:)));
+        V(iv,:)=V(iv,:)+reps*randn(size(V(iv,:)));
+        data = getMeshData(V,T);
+        if any(data.triangleAreas<0)
+            warning('triangle inverted!!!');
+        end
+    end
     
     %% verify integrability
     intEdgeInds = find(~data.isBoundaryEdge);

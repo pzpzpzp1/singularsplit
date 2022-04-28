@@ -27,12 +27,12 @@ function [val, grad, extra] = dLda_part(dAda, fun, ls, ehat, x0, extraIn)
     [E5,dEduv5] = fun([u5;v5]);
 
     val1 = dot(dAda, [Eic E4 E5]);
-    val2 = l1u*dot(u1-u4,ehat) + l1v*dot(v1-v4,ehat) + l2u*dot(u3-u5,ehat) + l2v*dot(v3-v5,ehat);
+    val2 = -(l1u*dot(u1-u4,ehat) + l1v*dot(v1-v4,ehat) + l2u*dot(u3-u5,ehat) + l2v*dot(v3-v5,ehat));
     val = val1+val2;
     
     z = [0 0];
-    duv4 = dEduv4*dAda(3) - (l1u*[ehat; z'] + l1v*[z'; ehat]);
-    duv5 = dEduv5*dAda(4) - (l2u*[ehat; z'] + l2v*[z'; ehat]);
+    duv4 = dEduv4*dAda(3) + (l1u*[ehat; z'] + l1v*[z'; ehat]);
+    duv5 = dEduv5*dAda(4) + (l2u*[ehat; z'] + l2v*[z'; ehat]);
     duv45 = reshape([reshape(duv4,2,2); reshape(duv5,2,2); ],[],1);
     grad = duv45;
     

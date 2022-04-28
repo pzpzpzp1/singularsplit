@@ -3,10 +3,11 @@ clear all; close all;
 
 %% load data
 optol = 1e-6;
-[x,u,v,V,T,data,lambda,fval0] = analyzePolar(1e-9,1e-9); close all;
+reps = .002; reps = 0;
+[x,u,v,V,T,data,lambda,fval0] = analyzePolar(1e-7,1e-7,reps); 
 data0 = getMeshData(V,T); data=data0; V0=V; T0=T;
 areaFromV123 = @(v123) dot(cross(v123(2,:)-v123(1,:),v123(3,:)-v123(1,:)),[0 0 1])/2;
-syms alpha real;
+syms alpha real; close all;
 
 boundaryVerts = unique(data.edges(data.isBoundaryEdge,:));
 innerEdges = find(all(~ismember(data.edges, boundaryVerts),2))'; niie = numel(innerEdges);
@@ -120,8 +121,11 @@ for j = 1:niie
         dot(u1,e3p); dot(v1,e3p); dot(u3,e4p); dot(v3,e4p); ];
     xperturb = A\B;
 
+    N=null(Am);
+    xrand = Am\Bm + N*randn(size(N,2),1);
+
     %% build ground truth frames
-    
+    %{
     newv = data.vertices(p1,:) + eps*[ehat' 0];
     newvind = data.numVertices+1;
     Vnew = [V0; newv]; 
@@ -134,16 +138,16 @@ for j = 1:niie
     % [intedgeind=3044: -34.112 | gt = -31.896       4.2846      -31.552      -8.3002       35.544      -6.0746      -28.372      -8.4041] 
     xr = reshape(newX,[],2);
     gt = reshape(xr(end-3:end,:),[],1);
-    
+    %}
 
     %% set primal virtual frames 
-    %{
-    A4_div_A5 = abs(norm(cross([e1v' 0],[ehat' 0]))/norm(cross([e2v' 0],[ehat' 0]))); % lopital
-    fun = @(x)obfun_wrapper(x,[A4_div_A5 1]);
-    options = optimoptions('fmincon','Display','Iter','CheckGradients',false,'SpecifyObjectiveGradient',true,'Algorithm','interior-point','HessianApproximation','lbfgs','SpecifyConstraintGradient',true,...
-        'OptimalityTolerance',optol);
-    xl = fmincon(fun,x0,[],[],Am,Bm,[],[],[],options); % use min energy frames
-    %}
+    
+%     A4_div_A5 = abs(norm(cross([e1v' 0],[ehat' 0]))/norm(cross([e2v' 0],[ehat' 0]))); % lopital
+%     fun = @(x)obfun_wrapper(x,[A4_div_A5 1]);
+%     options = optimoptions('fmincon','Display','Iter','CheckGradients',false,'SpecifyObjectiveGradient',true,'Algorithm','interior-point','HessianApproximation','lbfgs','SpecifyConstraintGradient',true,...
+%         'OptimalityTolerance',optol);
+%     xl = fmincon(fun,xperturb,[],[],Am,Bm,[],[],[],options); % use min energy frames
+    
 %     xl = gt; % use gt frames
 %     xl = xperturb; % use perturbation frames
     
@@ -151,7 +155,8 @@ for j = 1:niie
     options = optimoptions('fmincon','Display','Iter','CheckGradients',false,'SpecifyObjectiveGradient',true,'Algorithm','interior-point','HessianApproximation','lbfgs',...
         'OptimalityTolerance',optol,'ConstraintTolerance',1e-14);
     obfun = @(xx) dLda_part(dAda, @(x)obfun_wrapper(x, 1), [l1u l1v l2u l2v], ehat, xx);
-    [xl,~,exitflag,~,~,grad,hessian] = fmincon(obfun,gt,[],[],Am,Bm,[],[],@jacdets,options);
+    [xl,~,exitflag,~,~,grad,hessian] = fmincon(obfun,xperturb,[],[],Am,Bm,[],[],@jacdets,options);
+%     xl = xperturb;
 
     %% envelope gradient
     extraIn.u1=u1;
@@ -177,17 +182,17 @@ edgescore = -adiffs;
 edgescore = -fdiffs;
 edgescore = -adiffs;
 edgescore = -adiff_part1;
-edgescore = -adiff_part2;
+edgescore = -abs(adiff_part2);
 edgescore = adiffs2;
 %}
-edgescore(abs(edgescore)>prctile(abs(edgescore),99.99))=nan;
-edgescore(edgescore<prctile(edgescore,.01))=nan;
+edgescore(abs(edgescore)>prctile(abs(edgescore),99))=nan;
+edgescore(edgescore<prctile(edgescore,1))=nan;
 figure; hold all; rotate3d on; title('score'); axis equal;
-patch('faces',T,'Vertices',V,'facecolor','blue','edgecolor','none')
+patch('faces',T,'Vertices',V,'facecolor','none','edgecolor',[.9 .9 .9])
 xx = reshape(data.vertices(data.edges(innerEdges(order),:)',1),2,[]);
 yy = reshape(data.vertices(data.edges(innerEdges(order),:)',2),2,[]);
 xx(3,:)=nan;yy(3,:)=nan;xx = xx(:);yy = yy(:);
-patch(xx,yy,yy*0,repelem(edgescore,3,1),'edgecolor','interp','linewidth',2)
+patch(xx,yy,yy*0,repelem(edgescore,3,1),'edgecolor','interp','linewidth',3)
 colorbar;colormap(inferno);
 [~,maxind]=max(edgescore);
 patch('vertices',data.vertices,'faces',data.edges(innerEdges(order(maxind)),[1 2 1]),'edgecolor','green','linewidth',3)
