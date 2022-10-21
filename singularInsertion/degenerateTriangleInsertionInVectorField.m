@@ -91,8 +91,6 @@ lam0 = [lam1 lam1 lam3 lam3 0 lam6]; % augmented dual vars
 
 %% viz
 figure; title('primal obj'); plot(alphas,objval_alpha,'.-'); xline(0); yline(objval0,'green');
-% figure; plot(alphas,reshape(permute(lams_alpha,[2 1 3]),[],numel(alphas))','.-'); legend; xline(0); yline(0);
-% figure; plot((reshape(permute(lams_alpha,[2 1 3]),[],numel(alphas))./alphas)','.-'); legend;
 
 figure; cla; hold all; title('dual abs');
 plot(alphas,reshape(permute(lams_alpha([1],:),[2 1 3]),[],numel(alphas))','r.-','color','r');  xline(0); yline(0);
@@ -112,10 +110,6 @@ plot(alphas,reshape(permute(lams_alpha([3],:)-lam3(1),[2 1 3]),[],numel(alphas))
 plot(alphas,reshape(permute(lams_alpha([4],:)-lam3(1),[2 1 3]),[],numel(alphas))','.-','color',[.5,1,.5]); xline(0); yline(0);
 plot(alphas,reshape(permute(lams_alpha([5],:),[2 1 3]),[],numel(alphas))','k.-');  xline(0); yline(0);
 plot(alphas,reshape(permute(lams_alpha([6],:)-lam6(1),[2 1 3]),[],numel(alphas))','b.-');  xline(0); yline(0);
-% yline(lam1(1),'r');
-% yline(lam3(1),'g');
-% yline(lam6(1),'b');
-
 
 figure; cla; axis equal; hold all;
 for i=1:numel(alphas)
